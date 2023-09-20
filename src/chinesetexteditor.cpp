@@ -2,6 +2,8 @@
 // Copyright (C) 2023 Alexander Karpeko
 
 #include "chinesetexteditor.h"
+#include "elementextractor.h"
+#include "hanzifeatures.h"
 #include <QFileDialog>
 #include <QFont>
 #include <QMessageBox>
@@ -17,6 +19,8 @@ ChineseTextEditor::ChineseTextEditor(QWidget *parent) : QMainWindow(parent)
     connect(actionCopy, SIGNAL(triggered()), this, SLOT(copy()));
     connect(actionCut, SIGNAL(triggered()), this, SLOT(cut()));
     connect(actionFind, SIGNAL(triggered()), this, SLOT(find()));
+    connect(actionHanziEvaluator, SIGNAL(triggered()), this, SLOT(evaluateHanzi()));
+    connect(actionLearnHanziEvaluator, SIGNAL(triggered()), this, SLOT(learnHanziEvaluator()));
     connect(actionNewFile, SIGNAL(triggered()), this, SLOT(newFile()));
     connect(actionOpenFile, SIGNAL(triggered()), this, SLOT(openFile()));
     connect(actionOptions, SIGNAL(triggered()), this, SLOT(options()));
@@ -27,6 +31,9 @@ ChineseTextEditor::ChineseTextEditor(QWidget *parent) : QMainWindow(parent)
     connect(actionSaveFileAs, SIGNAL(triggered()), this, SLOT(saveFileAs()));
     connect(actionUndo, SIGNAL(triggered()), this, SLOT(undo()));
 
+    isEvaluated = false;
+    learnEvaluator = false;
+    learnedEvaluator = false;
     typeChineseCharacters = true;
     group = 0;
     number = 0;
@@ -43,7 +50,7 @@ ChineseTextEditor::ChineseTextEditor(QWidget *parent) : QMainWindow(parent)
     }
 
     translationObjects = translator.symbolObjects();
-    paintedImageNumbers.resize(translationObjects.size());
+    hanziImageNumbers.resize(translationObjects.size());
 }
 
 void ChineseTextEditor::about()
@@ -56,6 +63,7 @@ void ChineseTextEditor::clearInputWord()
 {
     selectorLineEdit->clear();
     monotonePinyin.clear();
+    isEvaluated = false;
     group = 0;
     number = 0;
 }
@@ -73,6 +81,32 @@ void ChineseTextEditor::copy()
 void ChineseTextEditor::cut()
 {
 
+}
+
+void ChineseTextEditor::evaluateHanzi()
+{
+    if (!learnedEvaluator)
+        return;
+
+    HanziFeatures hanziFeatures;
+    int features = hanziFeatures.exec() - 1;
+    if (features < 0)
+        return;
+
+    ImageElements imageElements;
+    imageElements.lineGroups = features >> 8;
+    imageElements.spaces = features & 0xff;
+
+    if (imageElements.lineGroups < 1 || imageElements.spaces < 1)
+        return;
+
+    unsigned long numbersSize = 0;
+    hanziImageNumbers.resize(translationObjects.size());
+    hanziEvaluator.imageNumbers(imageElements, hanziImageNumbers, numbersSize);
+    hanziImageNumbers.resize(numbersSize);
+    group = 0;
+    selectorLineEdit->setText(translator.symbols(hanziImageNumbers, group));
+    isEvaluated = true;
 }
 
 bool ChineseTextEditor::eventFilter(QObject *obj, QEvent *event)
@@ -110,7 +144,7 @@ bool ChineseTextEditor::eventFilter(QObject *obj, QEvent *event)
         selectorLineEdit->setText(translator.symbols(monotonePinyin, group));
     }
 
-    if (monotonePinyin.isEmpty())
+    if (monotonePinyin.isEmpty() && !isEvaluated)
         return false;
 
     if (isControl) {
@@ -122,15 +156,15 @@ bool ChineseTextEditor::eventFilter(QObject *obj, QEvent *event)
                 if (group > 0)
                     group--;
                 if (monotonePinyin.isEmpty())
-                    selectorLineEdit->setText(translator.symbols(paintedImageNumbers, group));
+                    selectorLineEdit->setText(translator.symbols(hanziImageNumbers, group));
                 else
                     selectorLineEdit->setText(translator.symbols(monotonePinyin, group));
                 break;
             case Qt::Key_Right:
             if (monotonePinyin.isEmpty()) {
-                if ((group + 1) * translator.groupSize < paintedImageNumbers.size())
+                if ((group + 1) * translator.groupSize < hanziImageNumbers.size())
                     group++;
-                selectorLineEdit->setText(translator.symbols(paintedImageNumbers, group));
+                selectorLineEdit->setText(translator.symbols(hanziImageNumbers, group));
             }
             else {
                 if (!translator.symbols(monotonePinyin, group).isEmpty())
@@ -143,7 +177,13 @@ bool ChineseTextEditor::eventFilter(QObject *obj, QEvent *event)
     if (isDigit) {
         number = character.toInt() - 1;
         QString hanzi;
-        hanzi = translator.symbol(monotonePinyin, group, number);
+        if (isEvaluated) {
+            unsigned long n = static_cast<unsigned long>(group * translator.groupSize + number);
+            unsigned long index = hanziImageNumbers[n];
+            hanzi = translationObjects[index].hanzi;
+        }
+        else
+            hanzi = translator.symbol(monotonePinyin, group, number);
         plainTextEdit->insertPlainText(hanzi);
         translationLineEdit->setText(translator.symbolData(hanzi));
         clearInputWord();
@@ -155,6 +195,24 @@ bool ChineseTextEditor::eventFilter(QObject *obj, QEvent *event)
 void ChineseTextEditor::find()
 {
 
+}
+
+void ChineseTextEditor::learnHanziEvaluator()
+{
+    if (learnEvaluator)
+        return;
+
+    learnEvaluator = true;
+    try {
+        hanziEvaluator.init(translationObjects);
+        hanziEvaluator.createVectors();
+        learnedEvaluator = true;
+        actionLearnHanziEvaluator->setEnabled(false);
+        actionHanziEvaluator->setEnabled(true);
+    }
+    catch (const char *e) {
+        QMessageBox::warning(this, tr("Error"), QString(e));
+    }
 }
 
 void ChineseTextEditor::newFile()

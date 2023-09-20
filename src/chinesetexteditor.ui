@@ -78,7 +78,7 @@
      <x>0</x>
      <y>0</y>
      <width>1280</width>
-     <height>22</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -115,6 +115,13 @@
     </property>
     <addaction name="actionFont"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionHanziEvaluator"/>
+    <addaction name="actionLearnHanziEvaluator"/>
+   </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
@@ -125,6 +132,7 @@
    <addaction name="menuEdit"/>
    <addaction name="menuFind"/>
    <addaction name="menuView"/>
+   <addaction name="menuTools"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -198,22 +206,10 @@
     <string>Font</string>
    </property>
   </action>
-  <action name="actionAbout">
-   <property name="text">
-    <string>About</string>
-   </property>
-  </action>
-  <action name="actionHanziRecognizer">
-   <property name="text">
-    <string>Hanzi Recognizer</string>
-   </property>
-  </action>
-  <action name="actionLearnHanziRecognizer">
-   <property name="text">
-    <string>Learn Hanzi Recognizer</string>
-   </property>
-  </action>
   <action name="actionHanziEvaluator">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Hanzi Evaluator</string>
    </property>
@@ -221,6 +217,11 @@
   <action name="actionLearnHanziEvaluator">
    <property name="text">
     <string>Learn Hanzi Evaluator</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
    </property>
   </action>
  </widget>
